@@ -1,4 +1,5 @@
-# quick python ui mockup to test layout and ring animations for the 10.1" screen
+# python ui layout test for the 10.1" screen
+# using a clean, warm light mode like a braun / teenage engineering desk display
 
 import math
 import sys
@@ -9,18 +10,19 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 WIDTH = 1024
-HEIGHT = 640  # 16:10 ratio scaled down from 1920x1200
+HEIGHT = 640  # 16:10 aspect ratio matching 1920x1200 panel
 
-BG_COLOR = (12, 16, 24)
-CARD_COLOR = (20, 26, 38)
-BORDER_COLOR = (38, 48, 68)
-TEXT_MAIN = (240, 244, 248)
-TEXT_DIM = (130, 145, 168)
+# Warm light mode palette
+BG_COLOR = (244, 243, 239)        # warm off-white / paper
+CARD_BG = (255, 255, 255)         # crisp white card
+BORDER_COLOR = (218, 215, 208)    # tactile neutral border
+TEXT_MAIN = (28, 32, 38)          # dark charcoal
+TEXT_MUTED = (118, 124, 136)      # muted slate gray
 
 STATE_COLORS = {
-    "IDLE": (64, 156, 255),
-    "LISTENING": (46, 229, 174),
-    "SPEAKING": (255, 168, 64),
+    "IDLE": (76, 92, 114),         # understated slate
+    "LISTENING": (42, 128, 92),    # forest green
+    "SPEAKING": (216, 96, 42),     # warm burnt orange
 }
 
 
@@ -35,92 +37,82 @@ def load_font(size, bold=False):
     return ImageFont.load_default()
 
 
-def render_frame(t, state, font_big, font_med, font_sm):
+def render_frame(t, state, font_big, font_med, font_reg, font_sm):
     img = Image.new("RGB", (WIDTH, HEIGHT), BG_COLOR)
     draw = ImageDraw.Draw(img)
 
-    # top status bar
-    draw.text((44, 34), "ORBIT", fill=TEXT_MAIN, font=font_med)
-    draw.ellipse((142, 42, 152, 52), fill=STATE_COLORS[state])
-    draw.text((164, 36), state.lower(), fill=TEXT_DIM, font=font_sm)
+    # Top header bar
+    draw.text((48, 34), "ORBIT-10", fill=TEXT_MAIN, font=font_med)
+    draw.ellipse((175, 42, 187, 54), fill=STATE_COLORS[state])
+    draw.text((200, 37), state.lower(), fill=TEXT_MUTED, font=font_reg)
 
-    status_right = "LAN: connected   |   mic: live"
-    draw.text((WIDTH - 310, 36), status_right, fill=TEXT_DIM, font=font_sm)
-    draw.line([(44, 84), (WIDTH - 44, 84)], fill=BORDER_COLOR, width=1)
+    draw.text((WIDTH - 290, 37), "wifi: 5ghz   |   mic: ready", fill=TEXT_MUTED, font=font_sm)
+    draw.line([(48, 82), (WIDTH - 48, 82)], fill=BORDER_COLOR, width=1)
 
-    # left side clock and ambient stats
+    # Big clock and day
     now = datetime.now()
     time_str = now.strftime("%H:%M")
     date_str = now.strftime("%A, %b %d")
 
-    draw.text((48, 130), time_str, fill=TEXT_MAIN, font=font_big)
-    draw.text((54, 275), date_str, fill=TEXT_DIM, font=font_med)
+    draw.text((48, 126), time_str, fill=TEXT_MAIN, font=font_big)
+    draw.text((54, 275), date_str, fill=TEXT_MUTED, font=font_med)
 
-    # room sensor placeholder cards (bme680 + hailo status)
+    # Clean white telemetry cards (BME680 + AI status)
     cards = [
-        ("ROOM", "24.4 C"),
-        ("HUMIDITY", "54 %"),
-        ("AI NODE", "Local"),
+        ("DESK TEMP", "23.8 C"),
+        ("HUMIDITY", "48 %"),
+        ("VOICE CORE", "Local"),
     ]
     x = 48
     for label, val in cards:
-        draw.rounded_rectangle([x, 380, x + 150, 480], radius=12, fill=CARD_COLOR, outline=BORDER_COLOR, width=1)
-        draw.text((x + 16, 398), label, fill=TEXT_DIM, font=font_sm)
-        draw.text((x + 16, 430), val, fill=TEXT_MAIN, font=font_med)
-        x += 166
+        draw.rounded_rectangle([x, 380, x + 154, 482], radius=8, fill=CARD_BG, outline=BORDER_COLOR, width=1)
+        draw.text((x + 18, 400), label, fill=TEXT_MUTED, font=font_sm)
+        draw.text((x + 18, 432), val, fill=TEXT_MAIN, font=font_med)
+        x += 170
 
-    # bottom prompt hint
-    draw.text((48, HEIGHT - 52), "space: cycle voice state    |    esc: quit", fill=(90, 102, 124), font=font_sm)
+    draw.text((48, HEIGHT - 46), "space: toggle state   |   esc: exit", fill=TEXT_MUTED, font=font_sm)
 
-    # right side animated orbit ring
+    # Right side: clean geometric orbit dial (no blurry neon glow)
     cx, cy = 760, 340
-    speed = 2.0 if state == "IDLE" else (5.0 if state == "LISTENING" else 8.0)
-    amp = 8 if state == "IDLE" else (18 if state == "LISTENING" else 26)
-    pulse = math.sin(t * speed) * amp
-
     color = STATE_COLORS[state]
-    outer_r = 128 + pulse
-    inner_r = 96 - (pulse * 0.4)
+    pulse = math.sin(t * 4.0) * (14 if state == "SPEAKING" else 8)
+    outer_r = 130 + pulse
+    inner_r = 92
 
-    # soft glow rings
-    for i in range(4, 0, -1):
-        r = outer_r + i * 7
-        fade = tuple(int(c * (0.28 / i)) for c in color)
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=fade, width=3)
+    # Clean geometric concentric rings with crisp line weights
+    draw.ellipse([cx - outer_r - 18, cy - outer_r - 18, cx + outer_r + 18, cy + outer_r + 18], outline=(230, 228, 222), width=1)
+    draw.ellipse([cx - outer_r, cy - outer_r, cx + outer_r, cy + outer_r], outline=color, width=4)
+    draw.ellipse([cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r], outline=BORDER_COLOR, width=2)
 
-    # main orbit circle and inner core
-    draw.ellipse([cx - outer_r, cy - outer_r, cx + outer_r, cy + outer_r], outline=color, width=5)
-    draw.ellipse([cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r], outline=(55, 70, 96), width=2)
-
-    # small orbiting dot around the ring
-    angle = t * (0.8 if state == "IDLE" else 2.4)
+    # Mechanical indicator dot orbiting the perimeter
+    angle = t * (0.8 if state == "IDLE" else 2.2)
     dot_x = cx + math.cos(angle) * outer_r
     dot_y = cy + math.sin(angle) * outer_r
-    draw.ellipse([dot_x - 8, dot_y - 8, dot_x + 8, dot_y + 8], fill=TEXT_MAIN)
+    draw.ellipse([dot_x - 7, dot_y - 7, dot_x + 7, dot_y + 7], fill=TEXT_MAIN)
 
     return img
 
 
 def main():
     font_big = load_font(120, bold=True)
-    font_med = load_font(26, bold=True)
-    font_sm = load_font(18, bold=False)
+    font_med = load_font(24, bold=True)
+    font_reg = load_font(18, bold=False)
+    font_sm = load_font(14, bold=False)
 
-    # save snapshot directly without launching window when --snap is passed
     if "--snap" in sys.argv:
-        frame = render_frame(1.4, "LISTENING", font_big, font_med, font_sm)
+        frame = render_frame(1.4, "LISTENING", font_big, font_med, font_reg, font_sm)
         out_path = Path(__file__).resolve().parent.parent / "docs" / "ui_test.png"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
         frame.save(out_path)
-        print(f"Saved preview to {out_path}")
+        print(f"Saved light mode preview to {out_path}")
         return
 
     root = tk.Tk()
-    root.title("Orbit UI Prototype (10.1 inch scale)")
+    root.title("Orbit UI Layout (10.1 inch Light Mode)")
     root.geometry(f"{WIDTH}x{HEIGHT}")
+    root.configure(bg="#F4F3EF")
     root.resizable(False, False)
 
-    label = tk.Label(root, bd=0)
+    label = tk.Label(root, bd=0, bg="#F4F3EF")
     label.pack()
 
     states = ["IDLE", "LISTENING", "SPEAKING"]
@@ -135,11 +127,11 @@ def main():
 
     def tick():
         t = time.time() - start_time
-        frame = render_frame(t, states[state_idx[0]], font_big, font_med, font_sm)
+        frame = render_frame(t, states[state_idx[0]], font_big, font_med, font_reg, font_sm)
         tk_img = ImageTk.PhotoImage(frame)
         label.configure(image=tk_img)
         label.image = tk_img
-        root.after(33, tick)  # ~30 fps
+        root.after(33, tick)
 
     tick()
     root.mainloop()
